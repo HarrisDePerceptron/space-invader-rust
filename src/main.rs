@@ -32,13 +32,95 @@ pub struct GameBuffer {
     enemy_gap: usize,
 
     ship_length: usize,
+    ship_current_box: Option<Container>,
 
     // x1, y1, x2, y2
     boundary_coordinates: (usize, usize, usize, usize),
 
-    last_bullet_location: Option<(usize, usize)>,
+    last_bullet: Option<Bullet>,
+}
 
-    bullet_speed: usize,
+#[derive(Debug, Clone)]
+pub struct Container {
+    pub top: Point,
+    pub bottom: Point,
+}
+
+#[derive(Debug, Clone)]
+pub struct Point {
+    pub x: usize,
+    pub y: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct Bullet {
+    location: Container,
+    speed: usize,
+
+    last_bullet_tick: Option<std::time::Instant>,
+    tick_duration: std::time::Duration,
+}
+
+impl Bullet {
+    pub fn new(x: usize, y: usize) -> Self {
+        Self {
+            location: Container {
+                top: Point { x, y },
+                bottom: Point { x, y },
+            },
+            speed: 1,
+            tick_duration: std::time::Duration::from_millis(30),
+            last_bullet_tick: None,
+        }
+    }
+
+    pub fn set_tick_duration(&mut self, duration: std::time::Duration) {
+        self.tick_duration = duration;
+    }
+
+    pub fn get_tick_duration(&self) -> std::time::Duration {
+        self.tick_duration
+    }
+
+    pub fn set_speed(&mut self, speed: usize) {
+        self.speed = speed
+    }
+
+    pub fn set_pos(&mut self, x: usize, y: usize) {
+        self.location.top.x = x;
+        self.location.top.y = y;
+
+        self.location.bottom.x = x;
+        self.location.bottom.y = y;
+    }
+
+    pub fn get_pos(&self) -> Point {
+        self.location.top.clone()
+    }
+
+    pub fn get_speed(&self) -> usize {
+        self.speed
+    }
+
+    fn move_bullet(&mut self) {
+        let pos = self.get_pos();
+        let new_y = pos.y - self.speed;
+        self.set_pos(pos.x, new_y);
+    }
+
+    pub fn tick(&mut self) {
+        let now = std::time::Instant::now();
+        if let Some(t) = &self.last_bullet_tick {
+            let diff = now - t.clone();
+            if diff >= self.tick_duration {
+                self.move_bullet();
+                self.last_bullet_tick = Some(now);
+            }
+        } else {
+            self.last_bullet_tick = Some(now);
+            return;
+        }
+    }
 }
 
 impl GameBuffer {
@@ -52,9 +134,11 @@ impl GameBuffer {
             enemy_gap: 2,
 
             ship_length: 3,
+            ship_current_box: None,
+
             boundary_coordinates: (2, 2, 62, 30),
-            last_bullet_location: None,
-            bullet_speed: 1,
+
+            last_bullet: None,
         };
 
         game_buffer.init(game);
@@ -83,7 +167,7 @@ impl GameBuffer {
                 let r = &mut self.grid[i];
                 let c = &mut r[j];
                 c.clear();
-                c.insert(0, 'X');
+                c.insert(0, '⍾');
             }
         }
     }
@@ -102,10 +186,23 @@ impl GameBuffer {
             c.clear();
             c.insert(0, ' ');
         }
-        for i in start..start + self.ship_length {
+        let ship_end = start + self.ship_length;
+
+        for i in start..ship_end {
             row[i].clear();
-            row[i].insert(0, '*');
+            row[i].insert(0, '⌬');
         }
+
+        self.ship_current_box = Some(Container {
+            top: Point {
+                x: start,
+                y: ship_y,
+            },
+            bottom: Point {
+                x: ship_end,
+                y: ship_y,
+            },
+        });
     }
 
     fn init_buffer(&mut self) {
@@ -145,6 +242,18 @@ impl GameBuffer {
         let end = self.get_cols() - 1 - self.ship_length;
 
         (start, end)
+    }
+
+    pub fn get_game_boundary(&self) -> (usize, usize, usize, usize) {
+        self.boundary_coordinates
+    }
+
+    pub fn get_ship_box(&self) -> Option<Container> {
+        self.ship_current_box.clone()
+    }
+
+    pub fn get_last_bullet(&self) -> Option<Bullet> {
+        self.last_bullet.clone()
     }
 
     fn draw_boundary(&mut self) {
@@ -210,60 +319,108 @@ impl GameBuffer {
         }
     }
 
-    pub fn draw_bullet(&mut self, mut x: usize, mut y: usize) {
-        if let Some((x_prev, y_prev)) = self.last_bullet_location {
-            if x != x_prev {
-                return;
-            }
+    pub fn fire_bullet(&mut self, start: Point) {
+        if self.last_bullet.is_none() {
+            self.last_bullet = Some(Bullet::new(start.x, start.y));
+            self.draw_bullet();
+        }
+    }
 
-            let bullet = &mut self.grid[y_prev][x_prev];
+    pub fn draw_bullet(&mut self) {
+        if let Some(bullet) = &self.last_bullet {
+            //let x_prev = bullet.location.top.x;
+            let mut y = bullet.location.top.y;
+
+            //if x != x_prev {
+            //    return;
+            //}
+            //
+
+            let mut x = bullet.location.top.x;
+
+            let y_prev = y + bullet.get_speed();
+
+            let bullet = &mut self.grid[y_prev][x];
             bullet.clear();
             bullet.insert(0, ' ');
+
+            let (x1, y1, x2, y2) = self.boundary_coordinates;
+
+            //bullet should remain within game boundaries
+            if y <= y1 {
+                y = y1 + 1;
+            }
+
+            if y >= y2 {
+                y = y2 - 2;
+            }
+
+            if x <= x1 {
+                x = x1 + 1;
+            }
+
+            if x >= x2 {
+                x = x2 - 1;
+            }
+
+            let pixel = &mut self.grid[y][x];
+            pixel.clear();
+            pixel.insert(0, '⌇');
         }
 
-        let (x1, y1, x2, y2) = self.boundary_coordinates;
-
-        //bullet should remain within game boundaries
-        if y <= y1 {
-            y = y1 + 1;
-        }
-
-        if y >= y2 {
-            y = y2 - 2;
-        }
-
-        if x <= x1 {
-            x = x1 + 1;
-        }
-
-        if x >= x2 {
-            x = x2 - 1;
-        }
-
-        let pixel = &mut self.grid[y][x];
-        pixel.clear();
-        pixel.insert(0, '|');
-
-        self.last_bullet_location = Some((x, y));
+        //if self.last_bullet.is_none() {
+        //    self.last_bullet = Some(Bullet::new(x, y));
+        //}
     }
 
     fn clear_bullet(&mut self) {
-        if let Some((x, y)) = self.last_bullet_location {
-            let item = &mut self.grid[y][x];
+        if let Some(bullet) = &self.last_bullet {
+            let pos = bullet.get_pos();
+
+            let x = pos.x;
+            let y = pos.y;
+
+            let item = &mut self.grid[y + 1][x];
 
             item.clear();
             item.insert(0, ' ');
+
+            self.last_bullet = None;
         }
     }
 
     pub fn bullet_progress(&mut self) {
-        if let Some((x, y)) = self.last_bullet_location {
-            let new_y = y - self.bullet_speed;
+        if let Some(bullet) = &mut self.last_bullet {
+            bullet.tick();
+        }
+        if let Some(bullet) = &self.last_bullet {
+            let pos = bullet.get_pos();
+
+            let new_y = pos.y - bullet.get_speed();
 
             if new_y <= self.boundary_coordinates.1 {
                 self.clear_bullet();
             } else {
-                self.draw_bullet(x, new_y);
+                self.draw_bullet();
+            }
+        }
+    }
+
+    pub fn collision_detection(&mut self, game: &mut Game) {
+        if let Some(bullet) = &self.last_bullet {
+            let pos = bullet.get_pos();
+
+            //check for enemy right above
+            let new_y = pos.y - bullet.get_speed();
+
+            let item = &mut self.grid[new_y][pos.x];
+
+            if item == "⍾" {
+                item.clear();
+                item.insert(0, ' ');
+                self.clear_bullet();
+
+                game.score += 10.0;
             }
         }
     }
@@ -333,6 +490,7 @@ impl KeyboardHandler {
 
     fn handle(&mut self, game_buffer: &mut GameBuffer) -> Option<KeyEvent> {
         let (ship_start, ship_end) = game_buffer.get_ship_boundary();
+        let ship_box = game_buffer.get_ship_box();
 
         if let Ok(v) = self.read_keyboard_event() {
             if let KeyCode::Left = v.code {
@@ -344,6 +502,18 @@ impl KeyboardHandler {
             if let KeyCode::Right = v.code {
                 if self.ship_position < ship_end {
                     self.ship_position += (self.step) as usize;
+                }
+            }
+
+            if let KeyCode::Char(' ') = v.code {
+                if let Some(b) = ship_box {
+                    if game_buffer.last_bullet.is_none() {
+                        let bullet_start = Point {
+                            x: b.top.x + 1,
+                            y: b.top.y + 1,
+                        };
+                        game_buffer.fire_bullet(bullet_start);
+                    }
                 }
             }
 
@@ -374,16 +544,17 @@ impl Drop for KeyboardHandler {
 fn main() -> Result<()> {
     println!("Hello, world!");
 
-    let game = Game::default();
+    let mut game = Game::default();
     let mut gb = GameBuffer::new(&game);
 
     let mut key_handler = KeyboardHandler::new();
 
-    gb.draw_bullet(10, 100);
     loop {
         let key_event = key_handler.handle(&mut gb);
 
         gb.bullet_progress();
+        gb.collision_detection(&mut game);
+        gb.draw_text(&game);
 
         let tr = TerminalRenderer::new(&gb);
         tr.draw()?;
@@ -393,7 +564,7 @@ fn main() -> Result<()> {
                 break;
             }
         }
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(std::time::Duration::from_millis(10));
     }
 
     Ok(())
