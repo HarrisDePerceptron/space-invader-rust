@@ -173,10 +173,14 @@ impl GameBuffer {
     }
 
     pub fn draw_ship(&mut self, mut start: usize) {
-        let (_, _, x2, y2) = self.boundary_coordinates;
+        let (x1, _, x2, y2) = self.boundary_coordinates;
 
         if start + self.ship_length > self.cols - 1 {
-            start = self.cols - 1;
+            start = self.cols - 1 - self.ship_length;
+        }
+
+        if start <= x1 {
+            start = x1 + 1;
         }
 
         let ship_y = y2 - 1;
@@ -331,11 +335,6 @@ impl GameBuffer {
             //let x_prev = bullet.location.top.x;
             let mut y = bullet.location.top.y;
 
-            //if x != x_prev {
-            //    return;
-            //}
-            //
-
             let mut x = bullet.location.top.x;
 
             let y_prev = y + bullet.get_speed();
@@ -380,10 +379,18 @@ impl GameBuffer {
             let x = pos.x;
             let y = pos.y;
 
-            let item = &mut self.grid[y + 1][x];
+            //let item = &mut self.grid[y + 1][x];
 
-            item.clear();
-            item.insert(0, ' ');
+            //item.clear();
+            //item.insert(0, ' ');
+
+            for i in 0..self.get_rows() {
+                let item = &mut self.grid[i][x];
+                if item == "⌇" {
+                    item.clear();
+                    item.insert(0, ' ');
+                }
+            }
 
             self.last_bullet = None;
         }
@@ -426,32 +433,46 @@ impl GameBuffer {
     }
 }
 
-pub struct TerminalRenderer<'a> {
-    game_buffer: &'a GameBuffer,
+pub struct TerminalRenderer {
+    window_size: Container,
+    prev_window_size: Container,
 }
 
-impl<'a> TerminalRenderer<'a> {
-    pub fn new(game_buffer: &'a GameBuffer) -> TerminalRenderer {
-        TerminalRenderer { game_buffer }
+impl TerminalRenderer {
+    pub fn new(window_size: Container) -> TerminalRenderer {
+        TerminalRenderer::set_size(&window_size).expect("Unable to resize terminal window");
+        let prev_size =
+            crossterm::terminal::window_size().expect("Unable to get terminal window size");
+
+        let prev_window_size = Container {
+            top: Point { x: 0, y: 0 },
+            bottom: Point {
+                x: prev_size.columns as usize,
+                y: prev_size.rows as usize,
+            },
+        };
+
+        TerminalRenderer {
+            window_size,
+            prev_window_size,
+        }
     }
 
     fn clear_screen(&self) -> Result<()> {
         let mut stdout = std::io::stdout();
 
-        crossterm::terminal::disable_raw_mode().unwrap();
         print!("\x1B[2J\x1B[1;1H");
         stdout.flush().unwrap();
-        crossterm::terminal::enable_raw_mode().unwrap();
         Ok(())
     }
 
-    pub fn draw(&self) -> Result<()> {
+    pub fn draw(&self, game_buffer: &GameBuffer) -> Result<()> {
         //self.clear_screen()?;
 
-        let buff = self.game_buffer.get_buffer();
+        let buff = game_buffer.get_buffer();
 
-        for i in 0..self.game_buffer.get_rows() {
-            for j in 0..self.game_buffer.get_cols() {
+        for i in 0..game_buffer.get_rows() {
+            for j in 0..game_buffer.get_cols() {
                 execute!(std::io::stdout(), cursor::MoveTo(j as u16, i as u16))?;
                 let item = &buff[i][j];
                 std::io::stdout().write_all(item.as_bytes())?;
@@ -459,6 +480,24 @@ impl<'a> TerminalRenderer<'a> {
         }
 
         Ok(())
+    }
+
+    pub fn set_size(container: &Container) -> Result<()> {
+        let cols = container.bottom.x - container.top.x;
+        let rows = container.bottom.y - container.top.y;
+
+        execute!(
+            std::io::stdout(),
+            crossterm::terminal::SetSize(cols as u16, rows as u16)
+        )?;
+
+        Ok(())
+    }
+}
+
+impl Drop for TerminalRenderer {
+    fn drop(&mut self) {
+        TerminalRenderer::set_size(&self.prev_window_size).expect("Unable to resize window");
     }
 }
 
@@ -493,16 +532,32 @@ impl KeyboardHandler {
         let ship_box = game_buffer.get_ship_box();
 
         if let Ok(v) = self.read_keyboard_event() {
-            if let KeyCode::Left = v.code {
-                if self.ship_position > ship_start {
-                    self.ship_position -= self.step as usize;
-                }
-            }
+            //if let KeyCode::Left = v.code {
+            //    if self.ship_position > ship_start {
+            //        self.ship_position -= self.step as usize;
+            //    }
+            //}
 
-            if let KeyCode::Right = v.code {
-                if self.ship_position < ship_end {
-                    self.ship_position += (self.step) as usize;
+            //if let KeyCode::Right = v.code {
+            //    if self.ship_position < ship_end {
+            //        self.ship_position += (self.step) as usize;
+            //    }
+            //}
+
+            if let Some(ship_container) = &ship_box {
+                let mut ship_position = ship_container.top.x;
+
+                if let KeyCode::Left = v.code {
+                    if ship_position > 0 {
+                        ship_position -= self.step as usize;
+                    }
                 }
+
+                if let KeyCode::Right = v.code {
+                    ship_position += self.step as usize;
+                }
+
+                game_buffer.draw_ship(ship_position);
             }
 
             if let KeyCode::Char(' ') = v.code {
@@ -510,17 +565,18 @@ impl KeyboardHandler {
                     if game_buffer.last_bullet.is_none() {
                         let bullet_start = Point {
                             x: b.top.x + 1,
-                            y: b.top.y + 1,
+                            y: b.top.y - 1,
                         };
                         game_buffer.fire_bullet(bullet_start);
                     }
                 }
             }
 
-            game_buffer.draw_ship(self.ship_position);
             Some(v)
         } else {
-            game_buffer.draw_ship(self.ship_position);
+            if let Some(ship_container) = &ship_box {
+                game_buffer.draw_ship(ship_container.top.x);
+            }
             None
         }
     }
@@ -542,7 +598,13 @@ impl Drop for KeyboardHandler {
     }
 }
 fn main() -> Result<()> {
-    println!("Hello, world!");
+    let window_size = Container {
+        top: Point { x: 0, y: 0 },
+        bottom: Point { x: 70, y: 35 },
+    };
+
+    let tr = TerminalRenderer::new(window_size);
+    tr.clear_screen()?;
 
     let mut game = Game::default();
     let mut gb = GameBuffer::new(&game);
@@ -555,9 +617,7 @@ fn main() -> Result<()> {
         gb.bullet_progress();
         gb.collision_detection(&mut game);
         gb.draw_text(&game);
-
-        let tr = TerminalRenderer::new(&gb);
-        tr.draw()?;
+        tr.draw(&gb)?;
 
         if let Some(v) = key_event {
             if let KeyCode::Esc = v.code {
