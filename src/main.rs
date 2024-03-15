@@ -413,7 +413,7 @@ impl GameBuffer {
         }
     }
 
-    pub fn collision_detection(&mut self, game: &mut Game) {
+    pub fn collision_detection(&mut self, game: &mut Game, game_audio: &audio::GameAudio) {
         if let Some(bullet) = &self.last_bullet {
             let pos = bullet.get_pos();
 
@@ -423,6 +423,8 @@ impl GameBuffer {
             let item = &mut self.grid[new_y][pos.x];
 
             if item == "⍾" {
+                game_audio.play_on_hit();
+
                 item.clear();
                 item.insert(0, ' ');
                 self.clear_bullet();
@@ -575,7 +577,7 @@ impl KeyboardHandler {
                         };
                         game_buffer.fire_bullet(bullet_start);
 
-                        if let Err(e) = game_audio.play_audio("assets/sounds/hit.mp3") {
+                        if let Err(e) = game_audio.play_fire() {
                             println!("Error in playing audio: {:?}", e);
                         }
                     }
@@ -627,7 +629,7 @@ fn main() -> Result<()> {
         let key_event = key_handler.handle(&mut gb, &mut game_audio);
 
         gb.bullet_progress();
-        gb.collision_detection(&mut game);
+        gb.collision_detection(&mut game, &game_audio);
         gb.draw_text(&game);
         tr.draw(&gb)?;
 
