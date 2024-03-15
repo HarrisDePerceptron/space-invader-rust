@@ -1,1 +1,6 @@
 /target
+
+/assets/sounds/*.*
+!/assets/sounds/*.mp3
+
+

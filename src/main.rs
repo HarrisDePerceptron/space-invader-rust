@@ -5,7 +5,7 @@ use crossterm::{
     terminal::{self, Clear, ClearType},
     ExecutableCommand,
 };
-use invader::sized_vector;
+use invader::{audio, sized_vector};
 use std::io::Write;
 
 pub struct Game {
@@ -527,7 +527,11 @@ impl KeyboardHandler {
         self.step = step
     }
 
-    fn handle(&mut self, game_buffer: &mut GameBuffer) -> Option<KeyEvent> {
+    fn handle(
+        &mut self,
+        game_buffer: &mut GameBuffer,
+        game_audio: &mut audio::GameAudio,
+    ) -> Option<KeyEvent> {
         let (ship_start, ship_end) = game_buffer.get_ship_boundary();
         let ship_box = game_buffer.get_ship_box();
 
@@ -546,6 +550,8 @@ impl KeyboardHandler {
 
             if let Some(ship_container) = &ship_box {
                 let mut ship_position = ship_container.top.x;
+
+                if let KeyCode::Up = v.code {}
 
                 if let KeyCode::Left = v.code {
                     if ship_position > 0 {
@@ -568,6 +574,10 @@ impl KeyboardHandler {
                             y: b.top.y - 1,
                         };
                         game_buffer.fire_bullet(bullet_start);
+
+                        if let Err(e) = game_audio.play_audio("assets/sounds/hit.mp3") {
+                            println!("Error in playing audio: {:?}", e);
+                        }
                     }
                 }
             }
@@ -611,8 +621,10 @@ fn main() -> Result<()> {
 
     let mut key_handler = KeyboardHandler::new();
 
+    let mut game_audio = audio::GameAudio::new();
+
     loop {
-        let key_event = key_handler.handle(&mut gb);
+        let key_event = key_handler.handle(&mut gb, &mut game_audio);
 
         gb.bullet_progress();
         gb.collision_detection(&mut game);
