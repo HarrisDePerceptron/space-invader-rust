@@ -4,6 +4,22 @@ use std::io::BufReader;
 
 use anyhow::{anyhow as error, Result};
 
+pub struct GameObjectSound {
+    path: String,
+}
+
+impl GameObjectSound {
+    pub fn new(path: &str) -> Self {
+        Self {
+            path: path.to_string(),
+        }
+    }
+    pub fn play(&self) -> Result<()> {
+        GameAudio::play_audio(&self.path)?;
+        Ok(())
+    }
+}
+
 pub struct GameAudio {
     hit_path: String,
     on_hit_path: String,
@@ -26,9 +42,7 @@ impl GameAudio {
         sink.sleep_until_end();
         Ok(())
     }
-    pub fn play_audio(&self, path: &str) -> Result<()> {
-        // Get a output stream handle to the default physical sound device
-        //
+    pub fn play_audio(path: &str) -> Result<()> {
         let path_t = path.to_string();
         std::thread::spawn(move || {
             let result = Self::play(&path_t);
@@ -37,20 +51,16 @@ impl GameAudio {
             }
         });
 
-        //self.audio_threads.push(handle);
-
-        //self.audio_threads.push(t1);
-
         Ok(())
     }
 
     pub fn play_fire(&self) -> Result<()> {
-        self.play_audio(&self.hit_path)?;
+        Self::play_audio(&self.hit_path)?;
         Ok(())
     }
 
     pub fn play_on_hit(&self) -> Result<()> {
-        self.play_audio(&self.on_hit_path)?;
+        Self::play_audio(&self.on_hit_path)?;
         Ok(())
     }
 }
