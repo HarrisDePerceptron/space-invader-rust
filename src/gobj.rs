@@ -20,6 +20,10 @@ impl GameObject {
         self.container.clone()
     }
 
+    pub fn set_container(&mut self, container: &Container) {
+        self.container = container.clone();
+    }
+
     pub fn get_width(&self) -> usize {
         self.container.bottom.x - self.container.top.x
     }

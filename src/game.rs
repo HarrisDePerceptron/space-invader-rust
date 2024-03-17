@@ -1,5 +1,6 @@
 use crate::container::{Container, Direction, Point};
 use crate::enemy::SmallAlien;
+use crate::ship::Ship;
 use crate::weapon::Bullet;
 
 pub struct Game {
@@ -20,6 +21,8 @@ pub struct Game {
     enemy_move_duration: std::time::Duration,
 
     last_bullet: Option<Bullet>,
+
+    ship: Ship,
 }
 
 impl Game {
@@ -54,6 +57,8 @@ impl Game {
             padding_vertical: 0,
         };
 
+        let ship = Ship::new(playable_area.top.x + 1, playable_area.bottom.y - 1, 3, 1);
+
         let mut game = Self {
             score,
             lives,
@@ -62,11 +67,12 @@ impl Game {
             playable_area,
             enemy_rows,
             enemy_cols,
-            enemy_direction: Direction::RIGHT,
+            enemy_direction: Direction::LEFT,
             enemy_speed: 1,
             last_bullet: None,
             enemy_last_move: std::time::Instant::now(),
             enemy_move_duration: std::time::Duration::from_millis(1000),
+            ship,
         };
 
         game.init();
@@ -101,6 +107,9 @@ impl Game {
     fn is_enemy_edge(&self) -> bool {
         let start_x = self.playable_area.top.x + 1;
         let end_x = self.playable_area.bottom.x - 1;
+
+        println!("start x is: {}", start_x);
+
         for e in &self.enemies {
             let current_pos = e.get_pos();
 
@@ -134,23 +143,25 @@ impl Game {
 
         let on_edge = self.is_enemy_edge();
         if on_edge {
-            if let Direction::RIGHT = self.enemy_direction {
-                self.enemy_direction = Direction::LEFT;
-            } else {
+            if let Direction::LEFT = self.enemy_direction {
                 self.enemy_direction = Direction::RIGHT;
+            } else if let Direction::RIGHT = self.enemy_direction {
+                self.enemy_direction = Direction::LEFT;
             }
         }
+
+        println!("Direction is : {:?}", self.enemy_direction);
 
         for e in &mut self.enemies {
             let mut current_pos = e.get_pos();
             let mut new_y = current_pos.y;
 
-            if on_edge && (new_y < end_y) {
-                new_y += 1;
-                current_pos.y = new_y;
-            }
+            //if on_edge && (new_y < end_y) {
+            //    new_y += 1;
+            //    current_pos.y = new_y;
+            //}
 
-            current_pos.y = new_y;
+            //current_pos.y = new_y;
 
             if let Direction::RIGHT = self.enemy_direction {
                 let new_x = current_pos.x + self.enemy_speed;
@@ -221,6 +232,28 @@ impl Game {
         self.move_enemy();
         self.move_bullet();
         self.collision_detection();
+    }
+
+    pub fn move_ship(&mut self, direction: Direction) {
+        let ship_container = self.ship.get_container();
+
+        if ship_container.bottom.x >= self.playable_area.bottom.x {
+            if let Direction::RIGHT = direction {
+                return;
+            }
+        }
+
+        if ship_container.top.x <= self.playable_area.top.x {
+            if let Direction::LEFT = direction {
+                return;
+            }
+        }
+
+        self.ship.move_ship(direction);
+    }
+
+    pub fn get_ship(&self) -> &Ship {
+        &self.ship
     }
 }
 

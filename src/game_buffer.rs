@@ -54,61 +54,6 @@ impl GameBuffer {
         }
     }
 
-    //pub fn draw_enemy(&mut self, start_row: usize, start_col: usize) {
-    //    for i in start_row..start_row + (self.enemy_rows * self.enemy_gap) {
-    //        if i % self.enemy_gap != 0 {
-    //            continue;
-    //        }
-    //        for j in start_col..start_col + (self.enemy_cols * self.enemy_gap) {
-    //            if j % self.enemy_gap != 0 {
-    //                continue;
-    //            }
-
-    //            let r = &mut self.grid[i];
-    //            let c = &mut r[j];
-    //            c.clear();
-    //            c.insert(0, '⍾');
-    //        }
-    //    }
-    //}
-
-    pub fn draw_ship(&mut self, mut start: usize) {
-        let (x1, _, x2, y2) = self.boundary_coordinates;
-
-        if start + self.ship_length > self.cols - 1 {
-            start = self.cols - 1 - self.ship_length;
-        }
-
-        if start <= x1 {
-            start = x1 + 1;
-        }
-
-        let ship_y = y2 - 1;
-
-        let row = &mut self.grid[ship_y];
-        for c in row.iter_mut() {
-            c.clear();
-            c.insert(0, ' ');
-        }
-        let ship_end = start + self.ship_length;
-
-        for i in start..ship_end {
-            row[i].clear();
-            row[i].insert(0, '⌬');
-        }
-
-        self.ship_current_box = Some(Container::new(
-            Point {
-                x: start,
-                y: ship_y,
-            },
-            Point {
-                x: ship_end,
-                y: ship_y,
-            },
-        ));
-    }
-
     fn init_buffer(&mut self) {
         for _ in 0..self.rows {
             let mut row: Vec<String> = vec![];
@@ -125,9 +70,6 @@ impl GameBuffer {
         self.draw_text(game);
         self.draw_boundary();
         let (x1, y1, _, _) = self.boundary_coordinates;
-
-        //self.draw_enemy(y1 + 1, 10);
-        self.draw_ship(0);
     }
 
     pub fn get_cols(&self) -> usize {
@@ -218,7 +160,23 @@ impl GameBuffer {
         }
     }
 
+    fn draw_ship(&mut self, game: &Game) {
+        let ship = game.get_ship();
+        let ship_container = ship.get_container();
+
+        let symbol = ship.get_symbol();
+
+        for i in 0..ship.get_width() {
+            let new_x = ship_container.top.x + i;
+            self.grid[ship_container.top.y][new_x] = symbol.to_string();
+        }
+    }
     pub fn draw(&mut self, game: &Game) {
+        self.clear();
+
+        self.draw_boundary();
+
+        self.draw_ship(game);
         for e in game.get_enemies() {
             let pos = e.get_pos();
             let symbol = e.get_symbol();
@@ -233,106 +191,4 @@ impl GameBuffer {
             self.grid[pos.y][pos.x] = symbol.to_string();
         }
     }
-
-    //pub fn fire_bullet(&mut self, start: Point) {
-    //    if self.last_bullet.is_none() {
-    //        self.last_bullet = Some(Bullet::new(start.x, start.y, Direction::UP));
-    //        self.draw_bullet();
-    //    }
-    //}
-
-    //pub fn draw_bullet(&mut self) {
-    //    if let Some(bullet) = &self.last_bullet {
-    //        //let x_prev = bullet.location.top.x;
-    //        let mut y = bullet.location.top.y;
-
-    //        let mut x = bullet.location.top.x;
-
-    //        let y_prev = y + bullet.get_speed();
-
-    //        let bullet = &mut self.grid[y_prev][x];
-    //        bullet.clear();
-    //        bullet.insert(0, ' ');
-
-    //        let (x1, y1, x2, y2) = self.boundary_coordinates;
-
-    //        //bullet should remain within game boundaries
-    //        if y <= y1 {
-    //            y = y1 + 1;
-    //        }
-
-    //        if y >= y2 {
-    //            y = y2 - 2;
-    //        }
-
-    //        if x <= x1 {
-    //            x = x1 + 1;
-    //        }
-
-    //        if x >= x2 {
-    //            x = x2 - 1;
-    //        }
-
-    //        let pixel = &mut self.grid[y][x];
-    //        pixel.clear();
-    //        pixel.insert(0, '⌇');
-    //    }
-    //}
-
-    //fn clear_bullet(&mut self) {
-    //    if let Some(bullet) = &self.last_bullet {
-    //        let pos = bullet.get_pos();
-
-    //        let x = pos.x;
-    //        let y = pos.y;
-
-    //        for i in 0..self.get_rows() {
-    //            let item = &mut self.grid[i][x];
-    //            if item == "⌇" {
-    //                item.clear();
-    //                item.insert(0, ' ');
-    //            }
-    //        }
-
-    //        self.last_bullet = None;
-    //    }
-    //}
-
-    //pub fn bullet_progress(&mut self) {
-    //    if let Some(bullet) = &mut self.last_bullet {
-    //        bullet.move_tick();
-    //    }
-    //    if let Some(bullet) = &self.last_bullet {
-    //        let pos = bullet.get_pos();
-
-    //        let new_y = pos.y - bullet.get_speed();
-
-    //        if new_y <= self.boundary_coordinates.1 {
-    //            self.clear_bullet();
-    //        } else {
-    //            self.draw_bullet();
-    //        }
-    //    }
-    //}
-
-    //pub fn collision_detection(&mut self, game: &mut Game, game_audio: &audio::GameAudio) {
-    //    if let Some(bullet) = &self.last_bullet {
-    //        let pos = bullet.get_pos();
-
-    //        //check for enemy right above
-    //        let new_y = pos.y - bullet.get_speed();
-
-    //        let item = &mut self.grid[new_y][pos.x];
-
-    //        if item == "⍾" {
-    //            game_audio.play_on_hit();
-
-    //            item.clear();
-    //            item.insert(0, ' ');
-    //            self.clear_bullet();
-
-    //            game.add_score(10.0);
-    //        }
-    //    }
-    //}
 }

@@ -11,7 +11,7 @@ use invader::{
 use crossterm::event::KeyCode;
 
 fn main() -> Result<()> {
-    let window_size = Container::new(Point { x: 0, y: 0 }, Point { x: 70, y: 35 });
+    let window_size = Container::new(Point { x: 0, y: 0 }, Point { x: 150, y: 35 });
 
     let tr = TerminalRenderer::new(window_size);
     tr.clear_screen()?;
