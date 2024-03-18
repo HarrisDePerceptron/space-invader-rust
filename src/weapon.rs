@@ -58,39 +58,39 @@ impl Bullet {
         self.speed = speed
     }
 
-    pub fn set_pos(&mut self, x: usize, y: usize) {
-        self.location.top.x = x;
-        self.location.top.y = y;
+    //pub fn set_pos(&mut self, x: usize, y: usize) {
+    //    self.location.top.x = x;
+    //    self.location.top.y = y;
 
-        self.location.bottom.x = x;
-        self.location.bottom.y = y;
-    }
+    //    self.location.bottom.x = x;
+    //    self.location.bottom.y = y;
+    //}
 
-    pub fn get_pos(&self) -> Point {
-        self.location.top.clone()
-    }
+    //pub fn get_pos(&self) -> Point {
+    //    self.location.top.clone()
+    //}
 
     pub fn get_speed(&self) -> usize {
         self.speed
     }
 
     fn move_bullet(&mut self) {
-        let pos = self.get_pos();
+        let mut pos = self.get_pos();
         let new_y = pos.y - self.speed;
-        self.set_pos(pos.x, new_y);
+        pos.y = new_y;
+        self.set_pos(&pos)
     }
 
     pub fn move_tick(&mut self) {
         let now = std::time::Instant::now();
-        if let Some(t) = &self.last_bullet_tick {
-            let diff = now - t.clone();
+        if let Some(t) = self.last_bullet_tick {
+            let diff = now - t;
             if diff >= self.tick_duration {
                 self.move_bullet();
                 self.last_bullet_tick = Some(now);
             }
         } else {
             self.last_bullet_tick = Some(now);
-            return;
         }
     }
 

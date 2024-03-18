@@ -42,24 +42,12 @@ impl KeyboardHandler {
         game: &mut Game,
     ) -> Option<KeyEvent> {
         if let Ok(v) = self.read_keyboard_event() {
-            let ship = game.get_ship();
-            let ship_container = ship.get_container();
-
             if let KeyCode::Char(' ') = v.code {
-                //if let Some(b) = ship_box {
-                if game_buffer.last_bullet.is_none() {
-                    let bullet_start = Point {
-                        x: ship_container.top.x + 1,
-                        y: ship_container.top.y - 1,
-                    };
-                    //game_buffer.fire_bullet(bullet_start);
-                    game.fire_bullet(bullet_start);
+                game.fire_bullet();
 
-                    if let Err(e) = game_audio.play_fire() {
-                        println!("Error in playing audio: {:?}", e);
-                    }
+                if let Err(e) = game_audio.play_fire() {
+                    println!("Error in playing audio: {:?}", e);
                 }
-                //}
             }
 
             if let KeyCode::Left = v.code {

@@ -183,6 +183,9 @@ impl Game {
         let mut score = 0.0;
 
         if let Some(bullet) = &mut self.last_bullet {
+            if bullet.is_destroyed() {
+                return;
+            }
             let b_pos = bullet.get_pos();
 
             //check for enemy right above
@@ -191,6 +194,9 @@ impl Game {
             //let item = &mut self.grid[new_y][pos.x];
 
             for e in &mut self.enemies {
+                if e.is_destroyed() {
+                    continue;
+                }
                 let e_pos = e.get_pos();
 
                 if e_pos.x == b_pos.x && e_pos.y == new_y {
@@ -212,15 +218,24 @@ impl Game {
             let next_pos = bullet.next_pos();
             if next_pos.y <= self.playable_area.top.y || next_pos.y >= self.playable_area.bottom.y {
                 bullet.destroy();
+                self.last_bullet = None;
             } else {
                 bullet.move_tick();
             }
         }
     }
 
-    pub fn fire_bullet(&mut self, start: Point) {
+    pub fn fire_bullet(&mut self) {
         if self.last_bullet.is_none() {
-            self.last_bullet = Some(Bullet::new(start.x, start.y, Direction::UP));
+            let ship_container = self.ship.get_container();
+            let middle: usize = self.ship.get_width() / 2;
+
+            let x = ship_container.top.x + middle;
+            let y = ship_container.top.y - 1;
+
+            let bullet = Bullet::new(x, y, Direction::UP);
+
+            self.last_bullet = Some(bullet);
         }
     }
 
@@ -254,6 +269,10 @@ impl Game {
 
     pub fn get_ship(&self) -> &Ship {
         &self.ship
+    }
+
+    pub fn get_bullet(&self) -> &Option<Bullet> {
+        &self.last_bullet
     }
 }
 

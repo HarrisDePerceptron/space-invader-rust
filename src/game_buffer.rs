@@ -19,8 +19,6 @@ pub struct GameBuffer {
 
     // x1, y1, x2, y2
     pub boundary_coordinates: (usize, usize, usize, usize),
-
-    pub last_bullet: Option<Bullet>,
 }
 
 impl GameBuffer {
@@ -37,8 +35,6 @@ impl GameBuffer {
             ship_current_box: None,
 
             boundary_coordinates: (2, 2, 62, 30),
-
-            last_bullet: None,
         };
 
         game_buffer.init(game);
@@ -96,10 +92,6 @@ impl GameBuffer {
 
     pub fn get_ship_box(&self) -> Option<Container> {
         self.ship_current_box.clone()
-    }
-
-    pub fn get_last_bullet(&self) -> Option<Bullet> {
-        self.last_bullet.clone()
     }
 
     fn draw_boundary(&mut self) {
@@ -171,24 +163,44 @@ impl GameBuffer {
             self.grid[ship_container.top.y][new_x] = symbol.to_string();
         }
     }
+
+    fn draw_bullet(&mut self, game: &Game) {
+        let bullet = game.get_bullet();
+        if let Some(b) = bullet {
+            if b.is_destroyed() {
+                return;
+            }
+            let contianer = b.get_container();
+            let x = contianer.top.x;
+            let y = contianer.top.y;
+
+            let symbol = b.get_symbol().to_string();
+
+            self.grid[y][x] = symbol;
+        }
+    }
+
+    fn draw_enemies(&mut self, game: &Game) {
+        for e in game.get_enemies() {
+            if e.is_destroyed() {
+                continue;
+            }
+            let pos = e.get_pos();
+            let symbol = e.get_symbol();
+
+            self.grid[pos.y][pos.x] = symbol.to_string();
+        }
+    }
+
     pub fn draw(&mut self, game: &Game) {
         self.clear();
 
         self.draw_boundary();
 
         self.draw_ship(game);
-        for e in game.get_enemies() {
-            let pos = e.get_pos();
-            let symbol = e.get_symbol();
 
-            self.grid[pos.y][pos.x] = symbol.to_string();
-        }
+        self.draw_bullet(game);
 
-        if let Some(bullet) = &self.last_bullet {
-            let pos = bullet.get_pos();
-            let symbol = bullet.get_symbol();
-
-            self.grid[pos.y][pos.x] = symbol.to_string();
-        }
+        self.draw_enemies(game);
     }
 }

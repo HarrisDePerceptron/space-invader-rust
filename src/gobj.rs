@@ -47,4 +47,8 @@ impl GameObject {
     pub fn get_pos(&self) -> Point {
         self.container.top.clone()
     }
+
+    pub fn is_destroyed(&self) -> bool {
+        self.destroyed
+    }
 }
