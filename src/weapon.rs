@@ -68,9 +68,7 @@ impl Bullet {
     }
 
     fn move_bullet(&mut self) {
-        let mut pos = self.get_pos();
-        let new_y = pos.y - self.speed;
-        pos.y = new_y;
+        let pos = self.next_pos();
         self.set_pos(&pos)
     }
 
@@ -91,13 +89,19 @@ impl Bullet {
     }
 
     pub fn next_pos(&self) -> Point {
-        let pos = self.get_pos();
-        let mut new_y = pos.y - self.get_speed();
+        let mut pos = self.get_pos();
 
-        if let Direction::DOWN = self.direction {
-            new_y = pos.y + self.get_speed();
+        if let Direction::UP = self.direction {
+            let new_y = pos.y - self.speed;
+            pos.y = new_y;
+        } else if let Direction::DOWN = self.direction {
+            let new_y = pos.y + self.speed;
+            pos.y = new_y;
         }
 
-        Point { x: pos.x, y: new_y }
+        pos
+    }
+    pub fn get_direction(&self) -> Direction {
+        self.direction.clone()
     }
 }

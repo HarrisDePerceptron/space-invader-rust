@@ -1,5 +1,7 @@
+use rand::Rng;
+
 use crate::container::{Container, Direction, Point};
-use crate::enemy::SmallAlien;
+use crate::enemy::{self, SmallAlien};
 use crate::ship::Ship;
 use crate::weapon::Bullet;
 
@@ -19,6 +21,10 @@ pub struct Game {
     enemy_speed: usize,
     enemy_last_move: std::time::Instant,
     enemy_move_duration: std::time::Duration,
+    enemy_gap: usize,
+    enemy_bullets: Vec<Bullet>,
+    enemy_attack_wait_duration: std::time::Duration,
+    last_enemy_attack_tick: std::time::Instant,
 
     last_bullet: Option<Bullet>,
 
@@ -59,6 +65,8 @@ impl Game {
 
         let ship = Ship::new(playable_area.top.x + 1, playable_area.bottom.y - 1, 3, 1);
 
+        let now = std::time::Instant::now();
+
         let mut game = Self {
             score,
             lives,
@@ -70,9 +78,13 @@ impl Game {
             enemy_direction: Direction::LEFT,
             enemy_speed: 1,
             last_bullet: None,
-            enemy_last_move: std::time::Instant::now(),
+            enemy_last_move: now,
             enemy_move_duration: std::time::Duration::from_millis(200),
             ship,
+            enemy_gap: 2,
+            enemy_bullets: vec![],
+            enemy_attack_wait_duration: std::time::Duration::from_millis(1500),
+            last_enemy_attack_tick: now,
         };
 
         game.init();
@@ -90,6 +102,15 @@ impl Game {
         self.score += s;
     }
 
+    pub fn init_ship(&mut self) {
+        let ship = Ship::new(
+            self.playable_area.top.x + 1,
+            self.playable_area.bottom.y - 1,
+            3,
+            1,
+        );
+        self.ship = ship;
+    }
     pub fn init_enemy(&mut self, start_x: usize, start_y: usize) {
         self.enemies.clear();
 
@@ -98,7 +119,9 @@ impl Game {
 
         for i in start_row..start_row + self.enemy_rows {
             for j in start_col..start_col + self.enemy_cols {
-                let enemy = SmallAlien::new(j, i);
+                let x = j * self.enemy_gap;
+
+                let enemy = SmallAlien::new(x, i);
                 self.enemies.push(enemy);
             }
         }
@@ -107,8 +130,6 @@ impl Game {
     fn is_enemy_edge(&self) -> bool {
         let start_x = self.playable_area.top.x + 1;
         let end_x = self.playable_area.bottom.x - 1;
-
-        println!("start x is: {}", start_x);
 
         for e in &self.enemies {
             let current_pos = e.get_pos();
@@ -171,7 +192,66 @@ impl Game {
         &self.enemies
     }
 
-    pub fn collision_detection(&mut self) {
+    pub fn enemy_attack(&mut self) {
+        let mut rng = rand::thread_rng();
+        let rand_index: usize = rng.gen_range(0..self.enemies.len());
+
+        let sel_enemy = &self.enemies[rand_index];
+        let enemy_container = sel_enemy.get_container();
+
+        let enemy_fire_stride: usize = sel_enemy.get_width() / 2;
+        let enemy_fire_x = enemy_container.top.x + enemy_fire_stride;
+        let enemy_fire_y = enemy_container.bottom.y + 1;
+
+        let now = std::time::Instant::now();
+        let last_enemy_attack_tick = now - self.last_enemy_attack_tick;
+
+        if last_enemy_attack_tick >= self.enemy_attack_wait_duration {
+            let bullet = Bullet::new(enemy_fire_x, enemy_fire_y, Direction::DOWN);
+            self.enemy_bullets.push(bullet);
+            self.last_enemy_attack_tick = now;
+        }
+    }
+
+    fn reduce_life(&mut self) {
+        if self.lives > 0 {
+            self.lives -= 1;
+        }
+    }
+
+    fn increase_life(&mut self) {
+        self.lives += 1;
+    }
+
+    fn detect_ship_collision(&mut self) {
+        let mut destroyed = false;
+        let mut bullet_index = 0;
+
+        for (idx, eb) in self.enemy_bullets.iter_mut().enumerate() {
+            let next_pos = eb.next_pos();
+            if let Direction::DOWN = eb.get_direction() {
+                let ship_container = self.ship.get_container();
+
+                println!("bullet nex pos: {:?}", next_pos);
+
+                if ship_container.top.y == next_pos.y
+                    && (next_pos.x >= ship_container.top.x && next_pos.x <= ship_container.bottom.x)
+                {
+                    eb.destroy();
+                    self.ship.destroy();
+                    bullet_index = idx;
+                    destroyed = true;
+                }
+            }
+        }
+
+        if destroyed {
+            self.reduce_life();
+            self.init_ship();
+            self.enemy_bullets.remove(bullet_index);
+        }
+    }
+    fn detect_enemy_collision(&mut self) {
         let mut score = 0.0;
 
         if let Some(bullet) = &mut self.last_bullet {
@@ -182,9 +262,6 @@ impl Game {
 
             //check for enemy right above
             let new_y = b_pos.y - bullet.get_speed();
-
-            //let item = &mut self.grid[new_y][pos.x];
-
             for e in &mut self.enemies {
                 if e.is_destroyed() {
                     continue;
@@ -205,7 +282,12 @@ impl Game {
         self.add_score(score);
     }
 
-    pub fn move_bullet(&mut self) {
+    fn collision_detection(&mut self) {
+        self.detect_enemy_collision();
+        self.detect_ship_collision();
+    }
+
+    fn move_bullet(&mut self) {
         if let Some(bullet) = &mut self.last_bullet {
             let next_pos = bullet.next_pos();
             if next_pos.y <= self.playable_area.top.y || next_pos.y >= self.playable_area.bottom.y {
@@ -214,6 +296,24 @@ impl Game {
             } else {
                 bullet.move_tick();
             }
+        }
+    }
+
+    fn move_enemy_bullets(&mut self) {
+        let mut destroyed_indexes = vec![];
+
+        for (i, eb) in self.enemy_bullets.iter_mut().enumerate() {
+            let next_pos = eb.next_pos();
+            if next_pos.y <= self.playable_area.top.y || next_pos.y >= self.playable_area.bottom.y {
+                eb.destroy();
+                destroyed_indexes.push(i);
+            } else {
+                eb.move_tick();
+            }
+        }
+
+        for idx in destroyed_indexes {
+            self.enemy_bullets.remove(idx);
         }
     }
 
@@ -233,9 +333,14 @@ impl Game {
 
     pub fn init(&mut self) {
         self.init_enemy(0, 0);
+        self.init_ship();
     }
 
     fn has_game_ended(&self) -> bool {
+        if self.lives == 0 {
+            return true;
+        }
+
         let last_y = self.playable_area.bottom.y - 1;
 
         for e in &self.enemies {
@@ -248,10 +353,18 @@ impl Game {
         false
     }
 
+    pub fn get_enemy_bullets(&self) -> &Vec<Bullet> {
+        &self.enemy_bullets
+    }
+
+    // keep ticking until game conditions have met
     pub fn tick(&mut self) -> bool {
         self.move_enemy();
         self.move_bullet();
         self.collision_detection();
+
+        self.enemy_attack();
+        self.move_enemy_bullets();
 
         !self.has_game_ended()
     }

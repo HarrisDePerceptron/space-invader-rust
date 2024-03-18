@@ -180,6 +180,22 @@ impl GameBuffer {
         }
     }
 
+    fn draw_enemy_bullet(&mut self, game: &Game) {
+        let bullets = game.get_enemy_bullets();
+        for eb in bullets {
+            if eb.is_destroyed() {
+                continue;
+            }
+            let contianer = eb.get_container();
+            let x = contianer.top.x;
+            let y = contianer.top.y;
+
+            let symbol = eb.get_symbol().to_string();
+
+            self.grid[y][x] = symbol;
+        }
+    }
+
     fn draw_enemies(&mut self, game: &Game) {
         for e in game.get_enemies() {
             if e.is_destroyed() {
@@ -202,5 +218,6 @@ impl GameBuffer {
         self.draw_bullet(game);
 
         self.draw_enemies(game);
+        self.draw_enemy_bullet(game);
     }
 }
