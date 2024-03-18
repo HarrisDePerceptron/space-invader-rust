@@ -21,20 +21,19 @@ fn main() -> Result<()> {
 
     let mut key_handler = KeyboardHandler::new();
 
-    let mut game_audio = audio::GameAudio::new();
-
     loop {
-        let key_event = key_handler.handle(&mut gb, &mut game_audio, &mut game);
+        let key_event = key_handler.handle(&mut game);
 
-        //gb.bullet_progress();
-        //gb.collision_detection(&mut game, &game_audio);
-
-        game.tick();
+        let keep_going = game.tick();
 
         gb.draw(&game);
 
         gb.draw_text(&game);
         tr.draw(&gb)?;
+
+        if !keep_going {
+            break;
+        }
 
         if let Some(v) = key_event {
             if let KeyCode::Esc = v.code {

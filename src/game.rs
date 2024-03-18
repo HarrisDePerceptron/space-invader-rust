@@ -71,7 +71,7 @@ impl Game {
             enemy_speed: 1,
             last_bullet: None,
             enemy_last_move: std::time::Instant::now(),
-            enemy_move_duration: std::time::Duration::from_millis(1000),
+            enemy_move_duration: std::time::Duration::from_millis(200),
             ship,
         };
 
@@ -135,33 +135,21 @@ impl Game {
             return;
         }
 
-        let start_x = self.playable_area.top.x + 1;
-        let start_y = self.playable_area.top.y + 1;
-
-        let end_x = self.playable_area.bottom.x - 1;
-        let end_y = self.playable_area.bottom.y - 1;
-
         let on_edge = self.is_enemy_edge();
+        let mut should_change_row = false;
+
         if on_edge {
             if let Direction::LEFT = self.enemy_direction {
                 self.enemy_direction = Direction::RIGHT;
+                should_change_row = true;
             } else if let Direction::RIGHT = self.enemy_direction {
                 self.enemy_direction = Direction::LEFT;
+                should_change_row = true;
             }
         }
 
-        println!("Direction is : {:?}", self.enemy_direction);
-
         for e in &mut self.enemies {
             let mut current_pos = e.get_pos();
-            let mut new_y = current_pos.y;
-
-            //if on_edge && (new_y < end_y) {
-            //    new_y += 1;
-            //    current_pos.y = new_y;
-            //}
-
-            //current_pos.y = new_y;
 
             if let Direction::RIGHT = self.enemy_direction {
                 let new_x = current_pos.x + self.enemy_speed;
@@ -169,6 +157,10 @@ impl Game {
             } else {
                 let new_x = current_pos.x - self.enemy_speed;
                 current_pos.x = new_x;
+            }
+
+            if should_change_row {
+                current_pos.y += 1;
             }
 
             e.set_pos(&current_pos);
@@ -243,10 +235,25 @@ impl Game {
         self.init_enemy(0, 0);
     }
 
-    pub fn tick(&mut self) {
+    fn has_game_ended(&self) -> bool {
+        let last_y = self.playable_area.bottom.y - 1;
+
+        for e in &self.enemies {
+            let current_pos = e.get_pos();
+            if current_pos.y >= last_y {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn tick(&mut self) -> bool {
         self.move_enemy();
         self.move_bullet();
         self.collision_detection();
+
+        !self.has_game_ended()
     }
 
     pub fn move_ship(&mut self, direction: Direction) {

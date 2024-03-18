@@ -4,6 +4,7 @@ use std::io::BufReader;
 
 use anyhow::{anyhow as error, Result};
 
+#[derive(Debug, Clone)]
 pub struct GameObjectSound {
     path: String,
 }

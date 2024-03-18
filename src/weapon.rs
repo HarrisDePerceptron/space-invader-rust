@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    audio::GameAudio,
+    audio::{GameAudio, GameObjectSound},
     container::{Container, Direction, Point},
     gobj::GameObject,
 };
@@ -16,6 +16,8 @@ pub struct Bullet {
 
     pub gobj: GameObject,
     pub direction: Direction,
+
+    on_fire_audio: GameObjectSound,
 }
 
 impl Deref for Bullet {
@@ -36,6 +38,8 @@ impl Bullet {
     pub fn new(x: usize, y: usize, direction: Direction) -> Self {
         let container = Container::new(Point { x, y }, Point { x, y });
 
+        let on_fire_audio = GameObjectSound::new("assets/sounds/hit.mp3");
+
         Self {
             location: Container::new(Point { x, y }, Point { x, y }),
             speed: 1,
@@ -43,6 +47,7 @@ impl Bullet {
             last_bullet_tick: None,
             gobj: GameObject::new(container, "⌇"),
             direction,
+            on_fire_audio,
         }
     }
 
@@ -57,18 +62,6 @@ impl Bullet {
     pub fn set_speed(&mut self, speed: usize) {
         self.speed = speed
     }
-
-    //pub fn set_pos(&mut self, x: usize, y: usize) {
-    //    self.location.top.x = x;
-    //    self.location.top.y = y;
-
-    //    self.location.bottom.x = x;
-    //    self.location.bottom.y = y;
-    //}
-
-    //pub fn get_pos(&self) -> Point {
-    //    self.location.top.clone()
-    //}
 
     pub fn get_speed(&self) -> usize {
         self.speed
@@ -91,6 +84,9 @@ impl Bullet {
             }
         } else {
             self.last_bullet_tick = Some(now);
+            self.on_fire_audio
+                .play()
+                .expect("Failed to play bullet audio");
         }
     }
 

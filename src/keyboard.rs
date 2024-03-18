@@ -35,19 +35,10 @@ impl KeyboardHandler {
         self.step = step
     }
 
-    pub fn handle(
-        &mut self,
-        game_buffer: &mut GameBuffer,
-        game_audio: &mut audio::GameAudio,
-        game: &mut Game,
-    ) -> Option<KeyEvent> {
+    pub fn handle(&mut self, game: &mut Game) -> Option<KeyEvent> {
         if let Ok(v) = self.read_keyboard_event() {
             if let KeyCode::Char(' ') = v.code {
                 game.fire_bullet();
-
-                if let Err(e) = game_audio.play_fire() {
-                    println!("Error in playing audio: {:?}", e);
-                }
             }
 
             if let KeyCode::Left = v.code {
