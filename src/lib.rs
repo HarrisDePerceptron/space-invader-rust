@@ -19,3 +19,5 @@ pub mod game_buffer;
 pub mod keyboard;
 
 pub mod ship;
+
+pub mod text_processing;
