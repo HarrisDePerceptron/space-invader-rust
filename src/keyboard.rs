@@ -6,6 +6,7 @@ use crate::audio;
 use crate::container::{Container, Direction, Point};
 use crate::game::Game;
 use crate::game_buffer::GameBuffer;
+use crate::renderer::TerminalRenderer;
 
 use anyhow::{anyhow as error, Result};
 
@@ -16,9 +17,9 @@ pub struct KeyboardHandler {
 }
 
 impl KeyboardHandler {
-    pub fn new() -> KeyboardHandler {
-        execute!(std::io::stdout(), crossterm::cursor::Hide).unwrap();
-        crossterm::terminal::enable_raw_mode().unwrap();
+    pub fn new(terminal: &mut TerminalRenderer) -> KeyboardHandler {
+        terminal.disable_cursor();
+        terminal.enable_raw_mode();
 
         KeyboardHandler {
             wait: 1,
@@ -65,9 +66,9 @@ impl KeyboardHandler {
     }
 }
 
-impl Drop for KeyboardHandler {
-    fn drop(&mut self) {
-        execute!(std::io::stdout(), crossterm::cursor::Show).unwrap();
-        crossterm::terminal::disable_raw_mode().unwrap();
-    }
-}
+//impl Drop for KeyboardHandler {
+//    fn drop(&mut self) {
+//        execute!(std::io::stdout(), crossterm::cursor::Show).unwrap();
+//        crossterm::terminal::disable_raw_mode().unwrap();
+//    }
+//}

@@ -5,9 +5,17 @@ use crate::enemy::{self, SmallAlien};
 use crate::ship::Ship;
 use crate::weapon::Bullet;
 
+pub enum GameCondition {
+    Running,
+    Win,
+    Loss,
+    Ended,
+}
+
 pub struct Game {
     score: f32,
     lives: usize,
+    max_lives: usize,
 
     enemies: Vec<SmallAlien>,
 
@@ -40,28 +48,7 @@ impl Game {
         enemy_rows: usize,
         enemy_cols: usize,
     ) -> Self {
-        let window = Container {
-            top: Point { x: 0, y: 0 },
-            bottom: Point {
-                x: width,
-                y: height,
-            },
-            padding_vertical: 2,
-            padding_horizontal: 2,
-        };
-
-        let playable_area = Container {
-            top: Point {
-                x: window.top.x + window.padding_horizontal,
-                y: window.top.y + window.padding_vertical,
-            },
-            bottom: Point {
-                x: window.bottom.x - window.padding_horizontal,
-                y: window.bottom.y - window.padding_vertical,
-            },
-            padding_horizontal: 0,
-            padding_vertical: 0,
-        };
+        let (window, playable_area) = Self::build_containers(width, height);
 
         let ship = Ship::new(playable_area.top.x + 1, playable_area.bottom.y - 1, 3, 1);
 
@@ -70,6 +57,7 @@ impl Game {
         let mut game = Self {
             score,
             lives,
+            max_lives: lives,
             window,
             enemies: vec![],
             playable_area,
@@ -89,6 +77,82 @@ impl Game {
 
         game.init();
         game
+    }
+
+    pub fn get_max_lives(&self) -> usize {
+        self.max_lives
+    }
+
+    pub fn set_lives(&mut self, lives: usize) {
+        self.lives = lives
+    }
+
+    pub fn set_score(&mut self, score: f32) {
+        self.score = score;
+    }
+
+    pub fn build_containers(width: usize, height: usize) -> (Container, Container) {
+        let window = Container {
+            top: Point { x: 0, y: 0 },
+            bottom: Point {
+                x: width,
+                y: height,
+            },
+            padding_vertical: 2,
+            padding_horizontal: 2,
+        };
+
+        let playable_width = (width as f32) * 0.7;
+        let playable_width = playable_width as usize;
+
+        let playable_area = Container {
+            top: Point {
+                x: window.top.x + window.padding_horizontal,
+                y: window.top.y + window.padding_vertical,
+            },
+            bottom: Point {
+                x: playable_width - window.padding_horizontal,
+                y: window.bottom.y - window.padding_vertical,
+            },
+            padding_horizontal: 0,
+            padding_vertical: 0,
+        };
+
+        (window, playable_area)
+    }
+
+    pub fn set_window(&mut self, width: usize, height: usize) {
+        let (window, playable_area) = Self::build_containers(width, height);
+
+        self.window = window;
+        self.playable_area = playable_area;
+    }
+
+    pub fn set_enemy_rows_cols(&mut self, mut rows: usize, mut cols: usize) {
+        if rows >= self.playable_area.get_height() - 1 {
+            rows = self.playable_area.get_height() - 1;
+        }
+
+        if cols >= self.playable_area.get_width() - 1 {
+            cols = self.playable_area.get_width() - 1;
+        }
+
+        self.enemy_rows = rows;
+        self.enemy_cols = cols;
+
+        self.init_enemy(0, 0);
+    }
+
+    pub fn get_enemies_rows_cols(&self) -> (usize, usize) {
+        (self.enemy_rows, self.enemy_cols)
+    }
+
+    pub fn get_playablearea(&self) -> Container {
+        self.playable_area.clone()
+    }
+
+    pub fn get_window(&self) -> Container {
+        self.window.clone()
     }
 
     pub fn get_score(&self) -> f32 {
@@ -232,8 +296,6 @@ impl Game {
             if let Direction::DOWN = eb.get_direction() {
                 let ship_container = self.ship.get_container();
 
-                println!("bullet nex pos: {:?}", next_pos);
-
                 if ship_container.top.y == next_pos.y
                     && (next_pos.x >= ship_container.top.x && next_pos.x <= ship_container.bottom.x)
                 {
@@ -336,9 +398,24 @@ impl Game {
         self.init_ship();
     }
 
-    fn has_game_ended(&self) -> bool {
+    fn has_game_ended(&self) -> GameCondition {
+        let total_enemies = self.enemy_rows * self.enemy_cols;
+        let mut destroyed_enemies = 0;
+        for e in &self.enemies {
+            if e.is_destroyed() {
+                destroyed_enemies += 1;
+            }
+        }
+
+        if destroyed_enemies >= total_enemies {
+            return GameCondition::Win;
+        }
+        if self.enemies.len() == 0 {
+            return GameCondition::Win;
+        }
+
         if self.lives == 0 {
-            return true;
+            return GameCondition::Loss;
         }
 
         let last_y = self.playable_area.bottom.y - 1;
@@ -346,11 +423,11 @@ impl Game {
         for e in &self.enemies {
             let current_pos = e.get_pos();
             if current_pos.y >= last_y {
-                return true;
+                return GameCondition::Loss;
             }
         }
 
-        false
+        GameCondition::Running
     }
 
     pub fn get_enemy_bullets(&self) -> &Vec<Bullet> {
@@ -358,7 +435,7 @@ impl Game {
     }
 
     // keep ticking until game conditions have met
-    pub fn tick(&mut self) -> bool {
+    pub fn tick(&mut self) -> GameCondition {
         self.move_enemy();
         self.move_bullet();
         self.collision_detection();
@@ -366,7 +443,7 @@ impl Game {
         self.enemy_attack();
         self.move_enemy_bullets();
 
-        !self.has_game_ended()
+        self.has_game_ended()
     }
 
     pub fn move_ship(&mut self, direction: Direction) {
@@ -393,6 +470,15 @@ impl Game {
 
     pub fn get_bullet(&self) -> &Option<Bullet> {
         &self.last_bullet
+    }
+
+    pub fn reset_game(&mut self) {
+        self.lives = self.max_lives;
+        self.score = 0.0;
+        self.last_bullet = None;
+        self.enemy_bullets.clear();
+
+        self.init();
     }
 }
 

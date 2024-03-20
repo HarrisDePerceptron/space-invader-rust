@@ -16,25 +16,32 @@ pub struct GameBuffer {
 
     pub ship_length: usize,
     pub ship_current_box: Option<Container>,
-
     // x1, y1, x2, y2
-    pub boundary_coordinates: (usize, usize, usize, usize),
+    //pub boundary_coordinates: (usize, usize, usize, usize),
+    //
+    playable_area: Container,
+    window: Container,
 }
 
 impl GameBuffer {
     pub fn new(game: &Game) -> GameBuffer {
+        let window = game.get_window();
+
+        let playable_area = game.get_playablearea();
+
         let mut game_buffer = GameBuffer {
             grid: vec![],
-            rows: 32,
-            cols: 64,
+            rows: window.get_height(),
+            cols: window.get_width(),
             enemy_rows: 5,
             enemy_cols: 11,
             enemy_gap: 2,
 
             ship_length: 3,
             ship_current_box: None,
-
-            boundary_coordinates: (2, 2, 62, 30),
+            //boundary_coordinates: (2, 2, 62, 30),
+            playable_area,
+            window,
         };
 
         game_buffer.init(game);
@@ -65,7 +72,6 @@ impl GameBuffer {
 
         self.draw_text(game);
         self.draw_boundary();
-        let (x1, y1, _, _) = self.boundary_coordinates;
     }
 
     pub fn get_cols(&self) -> usize {
@@ -86,23 +92,23 @@ impl GameBuffer {
         (start, end)
     }
 
-    pub fn get_game_boundary(&self) -> (usize, usize, usize, usize) {
-        self.boundary_coordinates
-    }
+    //pub fn get_game_boundary(&self) -> (usize, usize, usize, usize) {
+    //    self.boundary_coordinates
+    //}
 
     pub fn get_ship_box(&self) -> Option<Container> {
         self.ship_current_box.clone()
     }
 
     fn draw_boundary(&mut self) {
-        let (x1, y1, x2, y2) = self.boundary_coordinates;
+        //let (x1, y1, x2, y2) = self.boundary_coordinates;
 
-        for i in 0..self.get_rows() {
-            for j in 0..self.get_cols() {
+        for i in 0..self.window.get_height() {
+            for j in 0..self.playable_area.get_width() + self.window.padding_horizontal * 2 {
                 let row = &mut self.grid[i];
                 let item = &mut row[j];
 
-                if i == y1 || i == y2 {
+                if i == self.playable_area.top.y || i == self.playable_area.bottom.y {
                     item.clear();
                     item.insert(0, '-');
                 }
@@ -119,14 +125,14 @@ impl GameBuffer {
 
         let total_len = score_text_len + lives_text_len;
 
-        if total_len > self.cols {
+        if total_len > self.playable_area.get_width() {
             panic!(
                 "Text length exceeds total buffer cols: {}>{}",
                 total_len, self.cols
             );
         }
 
-        let space_len = self.cols - total_len;
+        let space_len = self.playable_area.get_width() - total_len;
 
         let mut game_display_text = String::new();
         game_display_text += score_text.as_str();
@@ -137,7 +143,7 @@ impl GameBuffer {
 
         game_display_text += lives_text.as_str();
 
-        let display_row_index = self.boundary_coordinates.1 - 1;
+        let display_row_index = self.playable_area.top.y - 1;
         let display_row = &mut self.grid[display_row_index];
 
         assert!(
@@ -210,6 +216,7 @@ impl GameBuffer {
 
     pub fn draw(&mut self, game: &Game) {
         self.clear();
+        self.draw_text(game);
 
         self.draw_boundary();
 
